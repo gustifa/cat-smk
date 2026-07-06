@@ -31,6 +31,7 @@ Route::middleware(['auth', 'role:admin,teacher'])->group(function () {
 
     // Route untuk mengambil data JSON Datatables
     Route::get('/questions/data', [QuestionController::class, 'data'])->name('questions.data');
+    Route::post('/questions/generate', [QuestionController::class, 'generateWithAI']);
     
     // Route untuk halaman CRUD
     Route::resource('questions', QuestionController::class);
@@ -47,7 +48,7 @@ Route::middleware(['auth', 'role:admin,teacher'])->group(function () {
     Route::get('/reports/exam/{id}/pdf', [ReportController::class, 'exportPdf'])->name('reports.pdf');
     Route::get('/reports/exam/{id}/excel', [ReportController::class, 'exportExcel'])->name('reports.excel');
     // Dashboard Guru (Pusat Unduh Laporan)
-    Route::get('/teacher/dashboard', [ReportController::class, 'index'])->name('teacher.dashboard');
+    Route::get('/teacher/report', [ReportController::class, 'index'])->name('teacher.dashboard');
 
     // Kelola Nilai & Remedial (Guru)
     Route::get('/teacher/exam/{id}/results', [ReportController::class, 'showResults'])->name('teacher.exam.results');

@@ -1,7 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { Head, Link } from '@inertiajs/react';
+import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout'; // Impor layout
+import { Head, Link, router } from '@inertiajs/react';
 import $ from 'jquery';
 import 'datatables.net-bs5';
+import Swal from 'sweetalert2';
 
 export default function Index() {
     const tableRef = useRef(null);
@@ -47,7 +49,30 @@ export default function Index() {
         $(tableRef.current).on('click', '.delete-btn', function() {
             const id = $(this).data('id');
             // Panggil SweetAlert di sini untuk konfirmasi hapus
-            console.log('Hapus ID:', id);
+            // console.log('Hapus ID:', id);
+
+            Swal.fire({
+        title: 'Apakah Anda yakin?',
+        text: "Data soal yang dihapus tidak dapat dikembalikan!",
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#d33',
+        cancelButtonColor: '#3085d6',
+        confirmButtonText: 'Ya, hapus!',
+        cancelButtonText: 'Batal'
+    }).then((result) => {
+        if (result.isConfirmed) {
+            // Melakukan request DELETE ke Laravel
+            router.delete(route('questions.destroy', id), {
+                onSuccess: () => {
+                    Swal.fire('Terhapus!', 'Data soal telah dihapus.', 'success');
+                },
+                onError: () => {
+                    Swal.fire('Gagal!', 'Terjadi kesalahan saat menghapus data.', 'error');
+                }
+            });
+        }
+    });
         });
 
         return () => {
@@ -56,31 +81,33 @@ export default function Index() {
     }, []);
 
     return (
-        <div className="container mt-5">
-            <Head title="Bank Soal" />
-            
-            <div className="card shadow-sm">
-                <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                    <h5 className="mb-0">Manajemen Bank Soal</h5>
-                    <Link href="/questions/create" className="btn btn-light btn-sm">
-                        + Tambah Soal
-                    </Link>
-                </div>
-                <div className="card-body">
-                    <div className="table-responsive">
-                        <table ref={tableRef} className="table table-bordered table-hover w-100">
-                            <thead className="table-light">
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Pertanyaan</th>
-                                    <th>Tipe Soal</th>
-                                    <th>Aksi</th>
-                                </tr>
-                            </thead>
-                        </table>
+        <AuthenticatedLayout>
+            <div className="container mt-5">
+                <Head title="Bank Soal" />
+                
+                <div className="card shadow-sm">
+                    <div className="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                        <h5 className="mb-0">Manajemen Bank Soal</h5>
+                        <Link href="/questions/create" className="btn btn-light btn-sm">
+                            + Tambah Soal
+                        </Link>
+                    </div>
+                    <div className="card-body">
+                        <div className="table-responsive">
+                            <table ref={tableRef} className="table table-bordered table-hover w-100">
+                                <thead className="table-light">
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Pertanyaan</th>
+                                        <th>Tipe Soal</th>
+                                        <th>Aksi</th>
+                                    </tr>
+                                </thead>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </AuthenticatedLayout>
     );
 }
