@@ -4,60 +4,54 @@ import Swal from 'sweetalert2';
 
 export default function TakeExam({ exam, questions }) {
     const { data, setData, post, processing } = useForm({
-        answers: {} // Menyimpan jawaban dengan key ID soal
+        answers: {}
     });
 
-    // Konversi durasi menit ke detik
-    // Membuat kunci penyimpanan unik berdasarkan ID Ujian
     const storageKey = `exam_endtime_${exam.id}`;
 
-    // Logika cerdas untuk membaca sisa waktu dari browser
+    // 1. Inisialisasi waktu dari localStorage agar tidak reset saat reload
     const [timeLeft, setTimeLeft] = useState(() => {
         const savedEndTime = localStorage.getItem(storageKey);
-        
         if (savedEndTime) {
-            // Jika siswa sudah pernah memulai, hitung sisa waktunya
-            const currentTime = new Date().getTime();
-            const remaining = Math.floor((parseInt(savedEndTime) - currentTime) / 1000);
+            const remaining = Math.floor((parseInt(savedEndTime) - new Date().getTime()) / 1000);
             return remaining > 0 ? remaining : 0;
         } else {
-            // Jika ini pertama kali ujian dibuka, catat waktu berakhirnya
             const endTime = new Date().getTime() + (exam.duration * 60 * 1000);
             localStorage.setItem(storageKey, endTime.toString());
             return exam.duration * 60;
         }
     });
 
-    // Efek Hitungan Mundur (Timer)
+    const [activeIndex, setActiveIndex] = useState(0);
+    const totalSoal = questions.length;
+
+    // 2. Timer Logic
     useEffect(() => {
         if (timeLeft <= 0) {
             handleAutoSubmit();
             return;
         }
-
         const timerId = setInterval(() => {
             setTimeLeft((prev) => prev - 1);
         }, 1000);
-
         return () => clearInterval(timerId);
     }, [timeLeft]);
 
-    // Format waktu menjadi MM:SS
     const formatTime = (seconds) => {
         const m = Math.floor(seconds / 60);
         const s = seconds % 60;
         return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    // Menyimpan jawaban per nomor ke state
     const handleAnswerChange = (questionId, value) => {
-        setData('answers', {
-            ...data.answers,
-            [questionId]: value
-        });
+        setData('answers', { ...data.answers, [questionId]: value });
     };
 
-    // Fungsi submit paksa jika waktu habis
+    const clearStorageAndSubmit = () => {
+        localStorage.removeItem(storageKey);
+        post(`/student/exam/${exam.id}/submit`);
+    };
+
     const handleAutoSubmit = () => {
         Swal.fire({
             title: 'Waktu Habis!',
@@ -65,12 +59,9 @@ export default function TakeExam({ exam, questions }) {
             icon: 'warning',
             showConfirmButton: false,
             timer: 2000
-        }).then(() => {
-            post(`/student/exam/${exam.id}/submit`);
-        });
+        }).then(() => clearStorageAndSubmit());
     };
 
-    // Fungsi submit manual oleh siswa
     const handleManualSubmit = (e) => {
         e.preventDefault();
         Swal.fire({
@@ -79,11 +70,8 @@ export default function TakeExam({ exam, questions }) {
             icon: 'question',
             showCancelButton: true,
             confirmButtonText: 'Ya, Akhiri & Simpan',
-            cancelButtonText: 'Batal'
         }).then((result) => {
-            if (result.isConfirmed) {
-                post(`/student/exam/${exam.id}/submit`);
-            }
+            if (result.isConfirmed) clearStorageAndSubmit();
         });
     };
 
@@ -91,7 +79,7 @@ export default function TakeExam({ exam, questions }) {
         <div className="container mt-4 mb-5">
             <Head title={`Ujian: ${exam.title}`} />
             
-            {/* Header lengket (Sticky) untuk Timer */}
+            {/* Header Sticky */}
             <div className="sticky-top bg-white py-3 shadow-sm mb-4 px-4 rounded border-bottom d-flex justify-content-between align-items-center">
                 <h5 className="mb-0 fw-bold">{exam.title}</h5>
                 <div className={`fs-4 fw-bold ${timeLeft < 300 ? 'text-danger' : 'text-success'}`}>
@@ -99,57 +87,66 @@ export default function TakeExam({ exam, questions }) {
                 </div>
             </div>
 
+            {/* Navigasi Nomor */}
+            <div className="flex flex-wrap gap-2 mb-4">
+                {questions.map((_, index) => (
+                    <button
+                        key={index} type="button"
+                        onClick={() => setActiveIndex(index)}
+                        className={`w-10 h-10 rounded-full font-bold transition-all ${
+                            activeIndex === index ? 'bg-blue-600 text-white' : 
+                            data.answers[questions[index].id] ? 'bg-green-500 text-white' : 'bg-gray-200'
+                        }`}
+                    >
+                        {index + 1}
+                    </button>
+                ))}
+            </div>
+
             <form onSubmit={handleManualSubmit}>
-                {questions.map((q, index) => (
-                    <div className="card shadow-sm mb-4 border-0" key={q.id}>
-                        <div className="card-header bg-light">
-                            <strong>Soal No. {index + 1}</strong>
+                {questions[activeIndex] && (
+                    <div className="card shadow-sm mb-4 border-0">
+                        <div className="card-header bg-light d-flex justify-content-between">
+                            <strong>Soal No. {activeIndex + 1}</strong>
+                            <span>{activeIndex + 1} dari {totalSoal}</span>
                         </div>
                         <div className="card-body">
-                            <p className="fs-5">{q.question_text}</p>
+                            <p className="fs-5">{questions[activeIndex].question_text}</p>
                             
-                            {/* Render Input berdasarkan Tipe Soal */}
-                            {q.type === 'pilihan_ganda' && q.options && (
+                            {/* Opsi Jawaban */}
+                            {questions[activeIndex].type === 'pilihan_ganda' && (
                                 <div>
                                     {['a', 'b', 'c', 'd', 'e'].map(opt => (
-                                        q.options[opt] && (
+                                        questions[activeIndex].options?.[opt] && (
                                             <div className="form-check mb-2" key={opt}>
                                                 <input 
-                                                    className="form-check-input" 
-                                                    type="radio" 
-                                                    name={`question_${q.id}`} 
-                                                    id={`q_${q.id}_${opt}`} 
-                                                    value={opt}
-                                                    onChange={(e) => handleAnswerChange(q.id, e.target.value)}
+                                                    className="form-check-input" type="radio" 
+                                                    checked={data.answers[questions[activeIndex].id] === opt}
+                                                    onChange={() => handleAnswerChange(questions[activeIndex].id, opt)}
                                                 />
-                                                <label className="form-check-label ms-2" htmlFor={`q_${q.id}_${opt}`}>
-                                                    <span className="text-uppercase fw-bold me-2">{opt}.</span> 
-                                                    {q.options[opt]}
-                                                </label>
+                                                <label className="form-check-label ms-2">{opt.toUpperCase()}. {questions[activeIndex].options[opt]}</label>
                                             </div>
                                         )
                                     ))}
                                 </div>
                             )}
-
-                            {q.type === 'isian_singkat' && (
-                                <input 
-                                    type="text" 
-                                    className="form-control" 
-                                    placeholder="Ketik jawaban singkat Anda di sini..." 
-                                    onChange={(e) => handleAnswerChange(q.id, e.target.value)}
-                                />
+                            {questions[activeIndex].type === 'isian_singkat' && (
+                                <input type="text" className="form-control" placeholder="Ketik jawaban..." 
+                                    value={data.answers[questions[activeIndex].id] || ''}
+                                    onChange={(e) => handleAnswerChange(questions[activeIndex].id, e.target.value)} />
                             )}
-                            
-                            {/* Logika untuk uraian dan menjodohkan bisa ditambahkan di sini */}
                         </div>
                     </div>
-                ))}
+                )}
 
-                <div className="d-grid mt-4">
-                    <button type="submit" className="btn btn-primary btn-lg fw-bold" disabled={processing}>
-                        {processing ? 'Menyimpan...' : 'Selesai & Kumpulkan Jawaban'}
-                    </button>
+                {/* Tombol Navigasi */}
+                <div className="d-flex justify-content-between mt-4">
+                    <button type="button" className="btn btn-outline-secondary" disabled={activeIndex === 0} onClick={() => setActiveIndex(activeIndex - 1)}>Sebelumnya</button>
+                    {activeIndex < totalSoal - 1 ? (
+                        <button type="button" className="btn btn-primary" onClick={() => setActiveIndex(activeIndex + 1)}>Selanjutnya</button>
+                    ) : (
+                        <button type="submit" className="btn btn-success fw-bold" disabled={processing}>Selesai & Kumpulkan</button>
+                    )}
                 </div>
             </form>
         </div>
