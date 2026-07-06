@@ -64,6 +64,8 @@ export default function Index() {
         if (result.isConfirmed) {
             // Melakukan request DELETE ke Laravel
             router.delete(route('questions.destroy', id), {
+                preserveState: false, // Memaksa komponen untuk re-render dari awal
+                preserveScroll: true,
                 onSuccess: () => {
                     Swal.fire('Terhapus!', 'Data soal telah dihapus.', 'success');
                 },
