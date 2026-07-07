@@ -116,4 +116,19 @@ class ExamController extends Controller
             return response()->json(['message' => 'Gagal menyimpan jawaban.'], 500);
         }
     }
+
+    public function activate(Request $request, $id)
+    {
+        $exam = Exam::findOrFail($id);
+        
+        // Generate token acak (misal: 6 karakter)
+        $token = strtoupper(substr(md5(rand()), 0, 6));
+        
+        $exam->update([
+            'is_active' => true,
+            'token' => $token
+        ]);
+
+        return back()->with('message', 'Ujian telah diaktifkan! Token: ' . $token);
+    }
 }

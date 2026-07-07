@@ -5,108 +5,245 @@ namespace App\Http\Controllers;
 use App\Models\Exam;
 use App\Models\Question;
 use App\Models\Answer;
-use App\Models\ExamResult; // Pastikan ini ditambahkan di atas
+use App\Models\ExamResult;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
+use Illuminate\Support\Facades\DB;
 
 class StudentExamController extends Controller
 {
-    // Menampilkan daftar ujian yang aktif di Dashboard Siswa
     public function index()
     {
-        // Hanya ambil ujian dengan status 'active'
-        // $activeExams = Exam::where('status', 'active')->get();
         $userId = auth()->id();
-        
-        // Ambil ujian aktif dan hitung berapa kali siswa sudah mengerjakannya
         $activeExams = Exam::where('status', 'active')->get()->map(function($exam) use ($userId) {
             $attempts = ExamResult::where('user_id', $userId)->where('exam_id', $exam->id)->count();
             $exam->attempts = $attempts;
-            $exam->is_locked = $attempts >= $exam->max_attempts; // Kunci jika batas tercapai
+            $exam->is_locked = $attempts >= ($exam->max_attempts ?? 1); 
             return $exam;
         });
+
         return Inertia::render('Students/Dashboard', [
             'exams' => $activeExams
         ]);
     }
 
-    // Menampilkan halaman pengerjaan soal
-    public function take($id)
-    {
-        $exam = Exam::findOrFail($id);
-        
-        // Ambil soal terkait ujian ini, acak urutannya
-        $questions = Question::where('exam_id', $id)->inRandomOrder()->get();
-
-        return Inertia::render('Students/TakeExam', [
-            'exam' => $exam,
-            'questions' => $questions
-        ]);
-    }
-
-    // Menyimpan jawaban (Kerangka awal)
-    // public function submit(Request $request, $id)
+    // public function show($id, Request $request)
     // {
-    //     // Logika untuk menyimpan array jawaban ke tabel answers akan ditempatkan di sini
-    //     // ...
-        
-    //     return redirect()->route('student.dashboard')->with('success', 'Ujian berhasil diselesaikan. Terima kasih!');
+    //     $exam = Exam::findOrFail($id);
+
+    //     // 1. Cek apakah ujian aktif
+    //     if ($exam->status !== 'active') {
+    //         return redirect()->route('student.dashboard')->with('error', 'Ujian belum dibuka.');
+    //     }
+
+    //     // 2. Cek apakah token di session valid dan cocok dengan database
+    //     $sessionToken = $request->session()->get('exam_token_' . $id);
+
+    //     if ($sessionToken !== $exam->token) {
+    //         return Inertia::render('Students/EnterToken', ['exam' => $exam]);
+    //     }
+
+    //     // 3. Jika token valid, ambil soal
+    //     $questions = Question::where('exam_id', $id)->inRandomOrder()->get();
+
+    //     return Inertia::render('Students/TakeExam', [
+    //         'exam' => $exam,
+    //         'questions' => $questions,
+    //         'isTokenValid' => true
+    //     ]);
     // }
 
-    public function submit(Request $request, $id)
+//     public function show($id, Request $request)
+// {
+//     $exam = Exam::findOrFail($id);
+
+//     // Cek aktif dan token (seperti kode sebelumnya)
+//     if ($exam->status !== 'active') {
+//         return redirect()->route('student.dashboard')->with('error', 'Ujian belum dibuka.');
+//     }
+
+//     $sessionToken = $request->session()->get('exam_token_' . $id);
+//     if ($sessionToken !== $exam->token) {
+//         return Inertia::render('Students/EnterToken', ['exam' => $exam]);
+//     }
+
+//     // 1. Ambil atau buat hasil ujian agar end_time ada
+//     $result = ExamResult::firstOrCreate(
+//         ['exam_id' => $id, 'user_id' => auth()->id()],
+//         ['end_time' => now()->addMinutes($exam->duration)]
+//     );
+
+//     $questions = Question::where('exam_id', $id)->inRandomOrder()->get();
+
+//     // 2. Kirim endTime ke frontend
+//     return Inertia::render('Students/TakeExam', [
+//         'exam' => $exam,
+//         'questions' => $questions,
+//         'endTime' => $result->end_time, // PENTING: Kirim data ini
+//         'isTokenValid' => true
+//     ]);
+// }
+
+// public function show($id, Request $request)
+// {
+//     $exam = Exam::findOrFail($id);
+
+//     // Cek aktif dan token (seperti kode sebelumnya)
+//     if ($exam->status !== 'active') {
+//         return redirect()->route('student.dashboard')->with('error', 'Ujian belum dibuka.');
+//     }
+
+//     $sessionToken = $request->session()->get('exam_token_' . $id);
+//     if ($sessionToken !== $exam->token) {
+//         return Inertia::render('Students/EnterToken', ['exam' => $exam]);
+//     }
+
+//     $studentId = auth()->id();
+    
+//     // Ambil hasil ujian siswa
+//     $result = ExamResult::where('exam_id', $id)->where('user_id', $studentId)->first();
+
+//     // Jika belum ada record ATAU end_time sudah lewat dari sekarang, buat/perbarui waktu
+//     if (!$result || now()->greaterThan($result->end_time)) {
+//         $result = ExamResult::updateOrCreate(
+//             ['exam_id' => $id, 'user_id' => $studentId],
+//             ['end_time' => now()->addMinutes($exam->duration)]
+//         );
+//     }
+
+//     $questions = Question::where('exam_id', $id)->inRandomOrder()->get();
+
+//     return Inertia::render('Students/TakeExam', [
+//         'exam' => $exam,
+//         'questions' => $questions,
+//         'endTime' => $result->end_time,
+//         'isTokenValid' => true
+//     ]);
+// }
+
+public function show($id, Request $request)
+{
+    $exam = Exam::findOrFail($id);
+    $studentId = auth()->id();
+
+    // 1. Cek status ujian
+    if ($exam->status !== 'active') {
+        return redirect()->route('student.dashboard')->with('error', 'Ujian belum dibuka.');
+    }
+
+    // 2. Cek token
+    $sessionToken = $request->session()->get('exam_token_' . $id);
+    if ($sessionToken !== $exam->token) {
+        return Inertia::render('Students/EnterToken', ['exam' => $exam]);
+    }
+
+    // 3. CEGAH AKSES jika sudah ada hasil ujian (sudah pernah submit)
+    $alreadySubmitted = ExamResult::where('exam_id', $id)
+                                  ->where('user_id', $studentId)
+                                  ->exists();
+    if ($alreadySubmitted) {
+        return redirect()->route('student.dashboard')->with('error', 'Anda sudah menyelesaikan ujian ini!');
+    }
+
+    $questions = Question::where('exam_id', $id)->inRandomOrder()->get();
+
+    return Inertia::render('Students/TakeExam', [
+        'exam' => $exam,
+        'questions' => $questions,
+        'endTime' => now()->addMinutes($exam->duration), // Kirim durasi waktu saja
+        'isTokenValid' => true
+    ]);
+}
+
+    public function verify(Request $request, $id)
     {
         $exam = Exam::findOrFail($id);
-        $student_id = auth()->id();
-        $submittedAnswers = $request->input('answers', []); // Data dari state React
+        $request->validate(['token' => 'required']);
 
-        // Ambil semua soal untuk ujian ini sebagai referensi kunci jawaban
-        $questions = Question::where('exam_id', $id)->get()->keyBy('id');
-
-        foreach ($submittedAnswers as $question_id => $studentAnswer) {
-            $question = $questions->get($question_id);
-            $isCorrect = false;
-
-            if ($question) {
-                // Pengecekan otomatis (khusus pilihan ganda dan isian singkat)
-                if (in_array($question->type, ['pilihan_ganda', 'isian_singkat'])) {
-                    // Cek jika jawaban sama persis dengan kunci (case-insensitive)
-                    if (strtolower(trim($studentAnswer)) === strtolower(trim($question->correct_answer))) {
-                        $isCorrect = true;
-                    }
-                }
-                
-                // Simpan setiap jawaban ke tabel answers
-                Answer::updateOrCreate(
-                    [
-                        'user_id' => $student_id,
-                        'exam_id' => $id,
-                        'question_id' => $question_id,
-                    ],
-                    [
-                        'answer_text' => $studentAnswer,
-                        'is_correct' => $isCorrect,
-                    ]
-                );
-            }
+        if ($request->token === $exam->token) {
+            $request->session()->put('exam_token_' . $id, $request->token);
+            return back()->with('success', 'Token valid! Ujian dimulai.');
         }
 
-        // HITUNG NILAI AKHIR (Persentase)
+        return back()->withErrors(['token' => 'Token tidak valid untuk mata ujian ini.']);
+    }
+
+    public function checkStatus($id)
+    {
+        $exam = Exam::findOrFail($id);
+        $sessionToken = session('exam_token_' . $id);
+
+        if ($exam->status !== 'active' || $sessionToken !== $exam->token) {
+            session()->forget('exam_token_' . $id);
+            return response()->json(['status' => 'kicked']);
+        }
+
+        return response()->json(['status' => 'active']);
+    }
+
+    // Tambahkan method submit dan autosave di bawah ini sesuai kebutuhan...
+
+    public function submit(Request $request, $id)
+{
+    $student_id = auth()->id();
+    $exam = Exam::findOrFail($id);
+
+    // 1. CEGAH DOUBLE SUBMISSION
+    $existingResult = ExamResult::where('exam_id', $id)
+        ->where('user_id', $student_id)
+        ->first();
+
+    if ($existingResult) {
+        return redirect()->route('student.dashboard')->with('error', 'Anda sudah menyelesaikan ujian ini!');
+    }
+
+    $submittedAnswers = $request->input('answers', []);
+    $questions = Question::where('exam_id', $id)->get()->keyBy('id');
+
+    // 2. GUNAKAN TRANSAKSI
+    DB::beginTransaction();
+    try {
+        foreach ($submittedAnswers as $question_id => $studentAnswer) {
+            $question = $questions->get($question_id);
+            if (!$question) continue;
+
+            $isCorrect = false;
+            if (in_array($question->type, ['pilihan_ganda', 'isian_singkat'])) {
+                if (strtolower(trim($studentAnswer)) === strtolower(trim($question->correct_answer))) {
+                    $isCorrect = true;
+                }
+            }
+
+            Answer::create([
+                'user_id' => $student_id,
+                'exam_id' => $id,
+                'question_id' => $question_id,
+                'answer_text' => $studentAnswer,
+                'is_correct' => $isCorrect,
+            ]);
+        }
+
+        // 3. HITUNG NILAI & SIMPAN HASIL
         $totalQuestions = $questions->count();
-        // Hitung berapa jawaban yang is_correct = true untuk siswa ini di ujian ini
         $correctCount = Answer::where('user_id', $student_id)
-                              ->where('exam_id', $id)
-                              ->where('is_correct', true)
-                              ->count();
+            ->where('exam_id', $id)
+            ->where('is_correct', true)
+            ->count();
 
         $score = $totalQuestions > 0 ? ($correctCount / $totalQuestions) * 100 : 0;
 
-        // SIMPAN REKAM JEJAK SELESAI
         ExamResult::create([
             'user_id' => $student_id,
             'exam_id' => $id,
             'score' => $score
         ]);
 
-        return redirect()->route('student.dashboard')->with('success', 'Ujian berhasil diselesaikan. Terima kasih!');
+        DB::commit();
+        return redirect()->route('student.dashboard')->with('success', 'Ujian berhasil diselesaikan!');
+
+    } catch (\Exception $e) {
+        DB::rollBack();
+        return back()->with('error', 'Gagal menyimpan jawaban: ' . $e->getMessage());
     }
+}
 }

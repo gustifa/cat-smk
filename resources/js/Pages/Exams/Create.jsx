@@ -12,7 +12,7 @@ export default function Create() {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        post('/exams', {
+        post('/teacher/exams', {
             onSuccess: () => {
                 Swal.fire({
                     title: 'Berhasil!',
@@ -76,7 +76,7 @@ export default function Create() {
                                     </div>
 
                                     <div className="d-flex justify-content-end gap-2">
-                                        <Link href="/exams" className="btn btn-secondary">Batal</Link>
+                                        <Link href="/teacher/exams" className="btn btn-secondary">Batal</Link>
                                         <button type="submit" className="btn btn-primary" disabled={processing}>
                                             {processing ? 'Menyimpan...' : 'Simpan Mata Ujian'}
                                         </button>

@@ -7,6 +7,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\StudentController;
 use App\Http\Controllers\StudentExamController;
+use App\Http\Controllers\TeacherExamController;
 
 use App\Http\Controllers\ExamController;
 use App\Http\Controllers\ReportController;
@@ -41,7 +42,7 @@ Route::middleware(['auth', 'role:admin,teacher'])->group(function () {
     Route::post('/students/import', [StudentController::class, 'import'])->name('students.import');
 
     // Route untuk Manajemen Mata Ujian (Admin/Guru)
-    Route::resource('exams', ExamController::class)->except(['show', 'edit', 'update']);
+    // Route::resource('exams', ExamController::class)->except(['show', 'edit', 'update']);
     // Export Detail Jawaban (Guru/Pengawas)
     Route::get('/reports/exam/{id}/answers/excel', [ReportController::class, 'exportAnswers'])->name('reports.answers.excel');
     // Export Laporan (Guru/Pengawas)
@@ -55,11 +56,31 @@ Route::middleware(['auth', 'role:admin,teacher'])->group(function () {
     Route::delete('/teacher/exam/{exam_id}/student/{user_id}/reset', [ReportController::class, 'resetStudent'])->name('teacher.exam.reset');
 });
 
+Route::middleware(['auth', 'role:admin,teacher'])->prefix('teacher')->group(function () {
+    // List Ujian & Aktivasi
+    Route::get('/exams', [TeacherExamController::class, 'index'])->name('teacher.exams.index');
+    Route::post('/exams', [TeacherExamController::class, 'store'])->name('teacher.exams.store');
+    Route::get('/exams/create', [TeacherExamController::class, 'create'])->name('teacher.exams.create');
+    Route::delete('/exams/{id}', [TeacherExamController::class, 'destroy'])->name('teacher.exams.destroy');
+    
+    // Generate Token & Aktifkan Ujian
+    Route::post('/exams/{exam}/activate', [TeacherExamController::class, 'activate'])->name('teacher.exams.activate');
+    
+    // Tutup Ujian
+    Route::post('/exams/{exam}/deactivate', [TeacherExamController::class, 'deactivate'])->name('teacher.exams.deactivate');
+});
+
 Route::middleware(['auth', 'role:student'])->group(function () {
     // Khusus Siswa
     Route::get('/student/dashboard', [StudentExamController::class, 'index'])->name('student.dashboard');
-    Route::get('/student/exam/{id}', [StudentExamController::class, 'take'])->name('student.exam.take');
+    // Route::get('/student/exam/{id}', [StudentExamController::class, 'take'])->name('student.exam.take');
+    Route::get('/student/exam/{id}', [StudentExamController::class, 'show'])->name('student.exam.show');
     Route::post('/student/exam/{id}/submit', [StudentExamController::class, 'submit'])->name('student.exam.submit');
+    Route::post('/student/exam/{exam}/autosave', [StudentExamController::class, 'autosave'])->name('student.exam.autosave');
+    Route::post('/student/exam/{exam}/verify', [StudentExamController::class, 'verify'])->name('student.exam.verify');
+
+    // routes/web.php
+    Route::get('/student/exam/{exam}/check-status', [StudentExamController::class, 'checkStatus']);
 
     
 });

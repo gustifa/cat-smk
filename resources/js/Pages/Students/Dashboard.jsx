@@ -56,6 +56,8 @@ export default function Dashboard({ exams }) {
                                                 Mulai Ujian Sekarang
                                             </Link>
                                         )}
+
+                                        
                                         
                                         <div className="text-center mt-2 small text-muted">
                                             Batas Pengerjaan: {exam.attempts} / {exam.max_attempts}

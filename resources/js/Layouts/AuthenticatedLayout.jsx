@@ -74,7 +74,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     )}
                     
                     {(user.role === 'admin' || user.role === 'teacher') &&  (
-                        <Link href={route('exams.index')} className="flex items-center p-3 hover:bg-blue-600 rounded-xl transition-all duration-200">
+                        <Link href={route('teacher.exams.index')} className="flex items-center p-3 hover:bg-blue-600 rounded-xl transition-all duration-200">
                             <BookOpenText size={22} />
                             {isSidebarOpen && <span className="ml-4 font-medium">Mapel</span>}
                         </Link>

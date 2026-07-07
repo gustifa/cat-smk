@@ -40,6 +40,7 @@ export default function Dashboard({ exams }) {
                         <p className="text-muted mb-0">SMK Negeri 1 Bukittinggi</p>
                     </div>
                 </div>
+                
 
                 <div className="card shadow-sm border-0">
                     <div className="card-header bg-dark text-white">
@@ -88,6 +89,7 @@ export default function Dashboard({ exams }) {
                                                         Kelola Remedial
                                                     </Link>
                                                 </td>
+                                                
                                             </tr>
                                         ))
                                     ) : (
